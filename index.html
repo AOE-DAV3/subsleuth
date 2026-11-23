@@ -131,6 +131,14 @@ details.setup summary{cursor:pointer;padding:16px 0;font-weight:800;min-height:4
 .insight:last-child{border:0}
 .insight .icon{flex:0 0 38px;width:38px;height:38px;border-radius:10px;background:var(--teal-soft);display:grid;place-items:center;font-size:1.1rem}
 
+/* Ended subscriptions + newsletters */
+.ended-item{padding:14px 0;border-bottom:1px solid var(--line)}
+.ended-item:last-child{border:0;padding-bottom:2px}
+.ended-item:first-of-type{padding-top:10px}
+.nl-row{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);align-items:center}
+.nl-row:last-child{border:0}
+.link-unsub{background:var(--teal-soft);color:var(--teal);padding:10px 14px;border-radius:10px;font-size:.88rem;font-weight:800;text-decoration:none;white-space:nowrap;min-height:40px;display:inline-flex;align-items:center;flex:0 0 auto}
+
 /* Sections */
 .section{margin:34px 0 0}
 .section-head{max-width:62ch}
@@ -261,6 +269,7 @@ footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:v
         </select>
       </div>
       <div class="sub-list" id="subList"></div>
+      <div id="endedWrap"></div>
       <div class="actions-row">
         <button class="btn btn-ghost" id="btnCsv">↓ Download CSV</button>
         <button class="btn btn-ghost" id="btnCopy">Copy summary</button>
@@ -275,6 +284,8 @@ footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:v
     <div id="view-insights" hidden>
       <div class="panel"><h3 style="margin-bottom:6px">Worth a second look</h3><div id="insightList"></div></div>
     </div>
+
+    <div id="newslettersWrap"></div>
   </section>
 
   <!-- HOW IT WORKS -->
@@ -343,7 +354,17 @@ var SAMPLE = [
 /* Distractor emails the scanner counts but correctly ignores */
 var DISTRACTORS = 12;
 
-var state = { subs:[], source:'sample', filter:'all', sort:'renewal', cancelled:{} };
+/* Sample newsletters (labelled sample data, same as the sample inbox).
+   A mix of https unsubscribe pages and mailto unsubscribe addresses. */
+var SAMPLE_NEWSLETTERS = [
+  {name:'Morning Brew',       email:'crew@morningbrew.com',    count:64, latestAgo:1,  target:{type:'url',    value:'https://www.morningbrew.com/unsubscribe'}},
+  {name:'TLDR',                email:'dan@tldrnewsletter.com',  count:88, latestAgo:0,  target:{type:'mailto', value:'unsubscribe@tldrnewsletter.com'}},
+  {name:'The Hustle',          email:'news@thehustle.co',       count:41, latestAgo:3,  target:{type:'url',    value:'https://thehustle.co/unsubscribe'}},
+  {name:'Product Hunt Daily',  email:'digest@producthunt.com',  count:57, latestAgo:2,  target:{type:'url',    value:'https://www.producthunt.com/unsubscribe'}},
+  {name:'Dense Discovery',     email:'hello@densediscovery.com',count:12, latestAgo:6,  target:{type:'mailto', value:'unsubscribe@densediscovery.com'}}
+];
+
+var state = { subs:[], ended:[], newsletters:[], newslettersError:false, newslettersPending:false, source:'sample', filter:'all', sort:'renewal', cancelled:{} };
 
 function daysFromNow(n){ var d=new Date(); d.setDate(d.getDate()+n); return d; }
 function fmtDate(d){ return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
@@ -401,7 +422,7 @@ function render(){
       + '</article>';
   });
   if(!cardHtml.length){
-    subList.innerHTML = '<div class="empty" style="width:100%">Nothing in this category.</div>';
+    subList.innerHTML = '<div class="empty" style="width:100%">'+(state.subs.length?'Nothing in this category.':'No active subscriptions found in this scan.')+'</div>';
   } else {
     /* Independent columns: each column is its own vertical stack, so expanding
        a card only pushes down the cards below it in the SAME column.
@@ -446,6 +467,62 @@ function render(){
   document.getElementById('insightList').innerHTML = insights.map(function(x){
     return '<div class="insight"><div class="icon">'+x.i+'</div><div><b>'+x.t+'</b><p class="muted" style="font-size:.92rem">'+x.d+'</p></div></div>';
   }).join('');
+
+  renderEnded();
+  renderNewsletters();
+}
+
+/* Ended subscriptions: shown only when a real scan found some. They live in
+   state.ended, never in state.subs, so they never touch the totals. */
+function renderEnded(){
+  var wrap=document.getElementById('endedWrap');
+  if(!wrap) return;
+  if(!state.ended || !state.ended.length){ wrap.innerHTML=''; return; }
+  var items=state.ended.map(function(s){
+    var lastPaid=daysFromNow(-s.ago).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    var ev=s.evidence.map(function(e){ return '<div style="padding:4px 0"><b>'+escapeHtml(e.subj)+'</b><br><span class="muted">'+escapeHtml(e.note)+' · '+escapeHtml(e.when)+'</span></div>'; }).join('');
+    return '<div class="ended-item">'
+      + '<div class="sub-top"><div class="avatar" style="background:'+s.color+'">'+initials(s.name)+'</div>'
+      + '<div><div class="sub-name">'+s.name+'</div><div class="sub-cat">'+s.cat+'</div></div>'
+      + '<div class="price"><b>'+fmtMoney(s.price)+'</b><span>/ '+s.cycle.toLowerCase().replace('ly','')+'</span></div></div>'
+      + '<div class="meta"><span class="tag soon">Ended — no renewal found</span><span class="tag">Last paid '+lastPaid+'</span><span class="tag">'+s.cycle+'</span></div>'
+      + '<div class="small">'+ev+'</div>'
+      + '</div>';
+  }).join('');
+  wrap.innerHTML='<div class="panel" style="margin-top:18px"><h3 style="margin-bottom:6px">Ended subscriptions</h3>'
+    + '<p class="muted small">The last receipt for each of these is old and no renewal followed it, so they no longer cost you anything — they are kept out of the totals above.</p>'
+    + items + '</div>';
+}
+
+/* Newsletters & mailing lists: state.newsletters only — never counted as
+   subscriptions, never part of the totals. */
+function renderNewsletters(){
+  var wrap=document.getElementById('newslettersWrap');
+  if(!wrap) return;
+  var body='';
+  if(state.newslettersPending){
+    body='<p class="small" style="margin-top:10px">Looking for newsletters from the last 90 days…</p>';
+  } else if(state.newslettersError){
+    body='<p class="small" style="margin-top:10px">The newsletter scan could not run this time. Your subscriptions above are unaffected — reconnect and scan again to retry it.</p>';
+  } else if(!state.newsletters.length){
+    body='<p class="small" style="margin-top:10px">No newsletters carrying an unsubscribe link were found in the last 90 days.</p>';
+  } else {
+    body=state.newsletters.map(function(n){
+      var btn;
+      if(n.target && n.target.type==='url'){
+        btn='<a class="link-unsub" href="'+escapeHtml(n.target.value)+'" target="_blank" rel="noopener">Unsubscribe ↗</a>';
+      } else if(n.target && n.target.type==='mailto'){
+        btn='<a class="link-unsub" href="mailto:'+escapeHtml(n.target.value)+'?subject='+encodeURIComponent('Unsubscribe')+'&amp;body='+encodeURIComponent('Please unsubscribe this email address from your mailing list.')+'">Unsubscribe</a>';
+      } else {
+        btn='<span class="small muted">No unsubscribe link found</span>';
+      }
+      return '<div class="nl-row"><div style="flex:1;min-width:0"><b>'+escapeHtml(n.name)+'</b><div class="small muted">'+escapeHtml(n.email)+' · '+n.count+' email'+(n.count===1?'':'s')+' in the last 90 days</div></div>'+btn+'</div>';
+    }).join('');
+  }
+  wrap.innerHTML='<div class="panel"><h3 style="margin-bottom:6px">Newsletters &amp; mailing lists</h3>'
+    + '<p class="muted small">Mailing lists you are subscribed to. These are not paid subscriptions and do not count toward your totals.</p>'
+    + body
+    + '<p class="small muted" style="margin-top:12px">SubSleuth is read-only — it opens the unsubscribe link; it cannot send an unsubscribe email itself.</p></div>';
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]}); }
 
@@ -499,7 +576,9 @@ document.getElementById('btnSample').addEventListener('click', function(){
     'Extracting prices, cycles & renewal dates…',
     'Done — 12 subscriptions, $190.40/month. 12 non-subscription emails ignored.'
   ], function(){
-    state.subs=buildSampleSubs(); state.source='sample'; state.cancelled={};
+    state.subs=buildSampleSubs(); state.ended=[]; state.newsletters=SAMPLE_NEWSLETTERS.slice();
+    state.newslettersError=false; state.newslettersPending=false;
+    state.source='sample'; state.cancelled={};
     showDashboard('Your subscriptions','Sample inbox · parsed on-device just now · demo data, clearly labelled');
     btn.disabled=false;
   });
@@ -508,7 +587,12 @@ document.getElementById('btnSample').addEventListener('click', function(){
 /* ============ Real Gmail (client-side, read-only) ============ */
 var accessToken=null;
 function parsePrice(text){
-  var m = String(text).match(/(?:\$|USD\s?)\s?(\d{1,4}(?:\.\d{2})?)/); return m?parseFloat(m[1]):null;
+  /* Accepts $, USD, ₦, NGN, £ or €, then an amount that may use thousands
+     separators — "₦1,600", "NGN 1,600.00", "$11.99", "$1,234.56". */
+  var m = String(text).match(/(?:\$|USD|₦|NGN|£|€)\s?(\d[\d,]*(?:\.\d{1,2})?)/);
+  if(!m) return null;
+  var n = parseFloat(m[1].replace(/,/g,''));
+  return isNaN(n) ? null : n;
 }
 function matchService(from, subject, body){
   var hay=(from+' '+subject+' '+body).toLowerCase();
@@ -524,6 +608,62 @@ function matchService(from, subject, body){
 function headerValue(headers,name){
   for(var i=0;i<(headers||[]).length;i++) if(headers[i].name.toLowerCase()===name) return headers[i].value;
   return '';
+}
+/* List-Unsubscribe headers are comma-separated angle-bracketed tokens, e.g.
+   "<https://example.com/unsub>, <mailto:leave@example.com?subject=unsub>".
+   Prefer an https URL; fall back to the mailto address. */
+function parseListUnsubscribe(value){
+  var tokens=String(value||'').match(/<[^>]+>/g)||[];
+  var url=null, mail=null;
+  tokens.forEach(function(t){
+    var v=t.slice(1,-1).trim();
+    if(/^https?:\/\//i.test(v)){ if(!url) url=v; }
+    else if(/^mailto:/i.test(v)){ if(!mail) mail=v.slice(7).split('?')[0]; }
+  });
+  if(url) return {type:'url', value:url};
+  if(mail) return {type:'mailto', value:mail};
+  return null;
+}
+function senderEmail(from){
+  var m=String(from||'').match(/<([^>]+)>/);
+  return (m?m[1]:String(from||'')).trim().toLowerCase();
+}
+function senderName(from){
+  var m=String(from||'').match(/^\s*"?([^"<@]+?)"?\s*(?:<|$)/);
+  return m?m[1].trim():'';
+}
+/* Newsletter scan: metadata only (List-Unsubscribe, From, Date) for messages
+   from the last 90 days; keep just the ones carrying a List-Unsubscribe
+   header and group them by sender. */
+function scanNewsletters(){
+  var nq=encodeURIComponent('newer_than:90d');
+  return gmailFetch('messages?q='+nq+'&maxResults=60').then(function(list){
+    var msgs=list.messages||[];
+    return Promise.all(msgs.map(function(m){
+      return gmailFetch('messages/'+m.id+'?format=metadata&metadataHeaders=List-Unsubscribe&metadataHeaders=From&metadataHeaders=Date').catch(function(){ return null; });
+    }));
+  }).then(function(results){
+    var bySender={};
+    results.forEach(function(msg){
+      if(!msg || !msg.payload) return;
+      var lu=headerValue(msg.payload.headers,'list-unsubscribe');
+      if(!lu) return;
+      var from=headerValue(msg.payload.headers,'from');
+      var email=senderEmail(from); if(!email) return;
+      var when=new Date(headerValue(msg.payload.headers,'date')||Date.now());
+      if(isNaN(when.getTime())) when=new Date();
+      var target=parseListUnsubscribe(lu);
+      var entry=bySender[email];
+      if(!entry){ entry=bySender[email]={ name: senderName(from)||email, email:email, count:0, latest:when, target:target }; }
+      entry.count++;
+      if(when>=entry.latest){
+        entry.latest=when;
+        if(target) entry.target=target;
+        var nm=senderName(from); if(nm) entry.name=nm;
+      }
+    });
+    return Object.keys(bySender).map(function(k){ return bySender[k]; }).sort(function(a,b){ return b.count-a.count; });
+  });
 }
 function decodeBody(part){
   try{ return atob((part.body.data||'').replace(/-/g,'+').replace(/_/g,'/')); }catch(e){ return ''; }
@@ -650,7 +790,7 @@ function scanRealGmail(status){
   var bar=document.getElementById('progGmail'); bar.style.display='block'; var fill=bar.querySelector('i');
   status.textContent='Connected. Searching your inbox for receipts & renewals…'; fill.style.width='25%';
   var q = encodeURIComponent('(receipt OR subscription OR renewal OR invoice OR "payment" OR billing) (netflix OR spotify OR youtube OR apple OR google OR adobe OR notion OR canva OR dropbox OR openai OR chatgpt OR figma OR microsoft OR disney OR amazon)');
-  gmailFetch('messages?q='+q+'&maxResults=60').then(function(list){
+  gmailFetch('messages?q='+q+'&maxResults=100').then(function(list){
     var msgs=list.messages||[];
     if(!msgs.length){ status.textContent='Search finished — no subscription receipts found in this inbox. Try the inbox where your services email you.'; fill.style.width='100%'; return; }
     status.textContent='Found '+msgs.length+' candidate emails. Reading & parsing them here in your browser…'; fill.style.width='55%';
@@ -677,12 +817,30 @@ function scanRealGmail(status){
         if(existing && existing.price!==price) byService[svc.id].prevPrice=existing.price; else if(existing) byService[svc.id].evidence=existing.evidence;
       }
     });
-    var subs=Object.keys(byService).map(function(k){ var s=byService[k]; s.next=nextRenewal(s); s.days=daysUntil(s); return s; });
+    var found=Object.keys(byService).map(function(k){ var s=byService[k]; s.next=nextRenewal(s); s.days=daysUntil(s); return s; });
     fill.style.width='100%';
-    if(!subs.length){ status.textContent='Emails read, but no priced subscription receipts matched yet. The dictionary covers 15 major services — check the Insights honesty notes in the FAQ.'; return; }
-    state.subs=subs; state.source='gmail'; state.cancelled={};
-    status.textContent='Done — found '+subs.length+' real subscription'+(subs.length>1?'s':'')+' in your Gmail.';
+    /* Ended: the newest receipt is older than 90 days (Monthly) or 400 days
+       (Yearly) with no renewal after it. Ended subs go to state.ended and
+       are listed separately — they never count toward the totals. */
+    var subs=[], ended=[];
+    found.forEach(function(s){
+      if(s.ago > (s.cycle==='Yearly' ? 400 : 90)) ended.push(s); else subs.push(s);
+    });
+    state.subs=subs; state.ended=ended; state.source='gmail'; state.cancelled={};
+    state.newsletters=[]; state.newslettersError=false; state.newslettersPending=true;
+    if(!found.length){
+      status.textContent='Emails read, but no priced subscription receipts matched yet. The dictionary covers 15 major services — check the Insights honesty notes in the FAQ.';
+    } else {
+      status.textContent='Done — found '+subs.length+' active subscription'+(subs.length===1?'':'s')+' in your Gmail'+(ended.length?', plus '+ended.length+' ended':'')+'.';
+    }
     showDashboard('Your subscriptions — from your real Gmail','Live Gmail scan · read-only · parsed in this browser tab, nothing stored');
+    /* Newsletter scan runs after the receipt results are on screen; if it
+       fails, the dashboard stays and the panel explains. */
+    scanNewsletters().then(function(list){
+      state.newsletters=list; state.newslettersPending=false; render();
+    }).catch(function(){
+      state.newsletters=[]; state.newslettersError=true; state.newslettersPending=false; render();
+    });
   }).catch(function(err){
     status.textContent='Something went wrong: '+err.message+'. Check the Client ID, that the Gmail API is enabled, and that this inbox is a listed test user.';
   });
@@ -704,7 +862,7 @@ document.getElementById('btnCopy').addEventListener('click', function(){
   if(navigator.clipboard) navigator.clipboard.writeText(txt).then(function(){toast('Summary copied.')});
 });
 document.getElementById('btnReset').addEventListener('click', function(){
-  state.subs=[]; state.cancelled={}; document.getElementById('dashboard').classList.remove('show');
+  state.subs=[]; state.ended=[]; state.newsletters=[]; state.newslettersError=false; state.newslettersPending=false; state.cancelled={}; document.getElementById('dashboard').classList.remove('show');
   document.getElementById('statusSample').textContent=''; window.scrollTo({top:0,behavior:'smooth'});
 });
 var toastTimer;
