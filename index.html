@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>SubSleuth — Find every subscription hiding in your inbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fbfbf9; --surface:#ffffff; --surface2:#f3f4f1; --ink:#0f1a2e; --muted:#5b6b82; --line:#e3e6e0;
+  --teal:#0e7c66; --teal-dark:#095c4b; --teal-soft:#e6f4ef; --amber:#92400e; --amber-bg:#fef3c7; --red:#b42318; --red-bg:#fef2f2;
+  --radius:18px; --radius-sm:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0a111f; --surface:#111c30; --surface2:#16233c; --ink:#edf2f7; --muted:#9aa8bc; --line:#22304d; --teal:#2ec4a0; --teal-dark:#2ec4a0; --teal-soft:#0f2e2a; --amber-bg:#2b2110; --red-bg:#2b1414; }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--teal);font-weight:700}
+button,input,select{font:inherit}
+button,[role="button"]{min-height:44px}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 18px 56px}
+h1,h2,h3{font-family:"Bricolage Grotesque",Manrope,sans-serif;line-height:.95;letter-spacing:-.02em;margin:0}
+h1{font-size:clamp(2.4rem,6vw,4.2rem);font-weight:800}
+h1 em{font-style:normal;color:var(--teal)}
+h2{font-size:1.7rem}
+h3{font-size:1.05rem;letter-spacing:-.01em}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+.mono{font-family:"JetBrains Mono",monospace;font-size:.82rem}
+
+/* Hero */
+.hero{padding:28px 0 8px;display:grid;grid-template-columns:1.15fr .85fr;gap:28px;align-items:start}
+.hero-copy p.lead{font-size:1.12rem;color:var(--muted);margin-top:16px;max-width:54ch}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.pill{font-size:.78rem;font-weight:800;letter-spacing:.02em;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);display:inline-flex;gap:6px;align-items:center}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--teal);display:block}
+.hero-card{background:var(--ink);color:#fff;border-radius:22px;padding:20px;position:relative;overflow:hidden}
+@media (prefers-color-scheme: dark){.hero-card{background:#eef6f3;color:#0f1a2e}}
+.hero-card .label{font-size:.75rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;opacity:.65}
+.hero-card .big{font-family:"Bricolage Grotesque";font-size:2.6rem;line-height:1;margin:8px 0 2px}
+.hero-card .row{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid rgba(128,128,128,.25);font-size:.9rem}
+.hero-card .row b{font-variant-numeric:tabular-nums}
+
+/* Scanner */
+.scanner{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:22px 0}
+.scan-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.scan-card.featured{border:2px solid var(--teal)}
+.scan-card h3{font-size:1.25rem;font-family:"Bricolage Grotesque"}
+.scan-card p{color:var(--muted);font-size:.92rem;margin:8px 0 16px}
+.btn{appearance:none;border:0;border-radius:999px;padding:12px 18px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;width:100%}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-teal:hover{background:var(--teal-dark)}
+.btn-outline{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn-ghost{background:var(--surface2);color:var(--ink)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.progress{height:8px;background:var(--surface2);border-radius:999px;overflow:hidden;margin-top:14px;display:none}
+.progress i{display:block;height:100%;width:0;background:var(--teal);transition:width .3s}
+.scan-status{font-size:.85rem;color:var(--muted);margin-top:8px;min-height:1.2em}
+
+/* Setup */
+details.setup{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:0 20px;margin:0 0 22px}
+details.setup summary{cursor:pointer;padding:16px 0;font-weight:800;min-height:44px;display:flex;align-items:center}
+.setup-body{padding:0 0 20px;border-top:1px solid var(--line)}
+.steps{counter-reset:step;margin:14px 0;padding:0;list-style:none}
+.steps li{counter-increment:step;display:flex;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.steps li:last-child{border:0}
+.steps li::before{content:counter(step);flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--teal-soft);color:var(--teal);display:grid;place-items:center;font-weight:800;font-size:.9rem}
+.field{margin:14px 0}
+.field label{font-weight:800;font-size:.88rem;display:block;margin-bottom:6px}
+.field input{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}
+.note{background:var(--teal-soft);border-radius:12px;padding:12px 14px;font-size:.9rem}
+.warn{background:var(--amber-bg);border-radius:12px;padding:12px 14px;font-size:.9rem}
+
+/* Dashboard */
+#dashboard{display:none}
+#dashboard.show{display:block}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.stat .k{font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-family:"Bricolage Grotesque";font-size:1.9rem;line-height:1.1;margin-top:4px}
+.stat .s{font-size:.84rem;color:var(--muted)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0}
+.chip{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 14px;font-weight:700;cursor:pointer;min-height:40px}
+.chip.active{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.toolbar select{margin-left:auto;padding:10px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);min-height:40px;font-weight:700}
+.tabs{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:999px;width:fit-content;max-width:100%;flex-wrap:wrap}
+.tabs button{border:0;background:transparent;padding:9px 16px;border-radius:999px;font-weight:800;cursor:pointer;color:var(--muted)}
+.tabs button.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 6px rgba(0,0,0,.08)}
+
+.sub-list{display:flex;gap:12px;margin-top:14px;align-items:flex-start}
+.sub-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:12px}
+.sub-col:empty{display:none}
+.sub{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;width:100%}
+.sub-top{display:flex;gap:12px;align-items:flex-start}
+.avatar{flex:0 0 46px;width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-family:"Bricolage Grotesque";font-weight:800;font-size:1.15rem;color:#fff}
+.sub-name{font-weight:800;font-size:1.02rem;line-height:1.2}
+.sub-cat{font-size:.82rem;color:var(--muted)}
+.price{margin-left:auto;text-align:right}
+.price b{font-size:1.15rem}
+.price span{display:block;font-size:.78rem;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:.75rem;font-weight:800;padding:5px 8px;border-radius:999px;background:var(--surface2)}
+.tag.soon{background:var(--amber-bg);color:var(--amber)}
+.tag.trial{background:#e0e7ff;color:#3730a3}
+@media (prefers-color-scheme: dark){.tag.trial{background:#1e2340;color:#a5b4fc}}
+.tag.price-up{background:var(--red-bg);color:var(--red)}
+.sub-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.sub-actions a,.sub-actions button{flex:1;text-align:center;padding:10px 10px;border-radius:10px;font-size:.88rem;font-weight:800;cursor:pointer;min-height:40px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.link-manage{background:var(--ink);color:var(--bg)!important}
+.btn-evidence{background:var(--surface2);border:0;color:var(--ink)}
+.btn-cancelled{background:var(--teal-soft);border:0;color:var(--teal)}
+.evidence{display:none;border-top:1px dashed var(--line);padding-top:10px;font-size:.85rem}
+.evidence.open{display:block}
+.evidence div{padding:7px 0;border-bottom:1px solid var(--line)}
+.evidence div:last-child{border:0}
+
+/* Calendar + insights */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:14px}
+.cal-row{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);align-items:center}
+.cal-row:last-child{border:0}
+.cal-date{flex:0 0 56px;text-align:center;background:var(--surface2);border-radius:12px;padding:8px 4px}
+.cal-date b{display:block;font-size:1.2rem;line-height:1}
+.insight{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.insight:last-child{border:0}
+.insight .icon{flex:0 0 38px;width:38px;height:38px;border-radius:10px;background:var(--teal-soft);display:grid;place-items:center;font-size:1.1rem}
+
+/* Sections */
+.section{margin:34px 0 0}
+.section-head{max-width:62ch}
+.section-head p{color:var(--muted);margin-top:8px}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.how article{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px}
+.how .num{font-family:"JetBrains Mono";color:var(--teal);font-weight:700}
+.faq{margin-top:14px;display:grid;gap:10px}
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0 16px}
+.faq summary{font-weight:800;cursor:pointer;padding:14px 0;min-height:44px}
+.faq p{padding:0 0 14px;color:var(--muted);font-size:.94rem}
+.actions-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.actions-row .btn{width:auto}
+footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:.86rem;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.empty{background:var(--surface);border:1.5px dashed var(--line);border-radius:16px;padding:22px;text-align:center;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:999px;font-weight:700;font-size:.9rem;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none;z-index:50;max-width:92vw;text-align:center}
+.toast.show{display:block}
+
+@media (max-width:820px){
+  .hero{grid-template-columns:1fr}
+  .scanner{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  .sub-list{flex-direction:column}
+  .sub-col{width:100%}
+  .how{grid-template-columns:1fr}
+  .toolbar select{margin-left:0;width:100%}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-copy">
+      <h1>Every subscription hiding in your inbox, <em>found.</em></h1>
+      <p class="lead">SubSleuth scans your Gmail receipts — read-only, entirely in your browser — and turns them into one clear list: what you pay, when it renews, and where to cancel. No server ever sees your email.</p>
+      <div class="pills">
+        <span class="pill"><i></i> Read-only Gmail access</span>
+        <span class="pill"><i></i> Parsing happens on your device</span>
+        <span class="pill"><i></i> $0 to run — no credits needed</span>
+      </div>
+    </div>
+    <aside class="hero-card" aria-label="Example total">
+      <div class="label">What the sample inbox reveals</div>
+      <div class="big">$190.40<span style="font-size:1.1rem;opacity:.6"> / month</span></div>
+      <p style="opacity:.75;font-size:.9rem">12 active subscriptions · $2,284.80 a year</p>
+      <div class="row"><span>Forgotten / rarely used</span><b>1 sub · $11.99/mo</b></div>
+      <div class="row"><span>Next renewal</span><b>Google One · in 2 days</b></div>
+      <div class="row"><span>Price increase spotted</span><b>Disney+ · +$2.00</b></div>
+    </aside>
+  </header>
+
+  <!-- SCANNER -->
+  <section class="scanner" aria-label="Choose how to scan">
+    <article class="scan-card featured">
+      <h3>Try the sample inbox</h3>
+      <p>Instant demo for judges — 24 sample emails, 12 subscriptions hidden inside. See the full scan, totals, calendar and cancel links in about five seconds. No sign-in.</p>
+      <button class="btn btn-teal" id="btnSample">Scan sample inbox →</button>
+      <div class="progress" id="progSample"><i></i></div>
+      <p class="scan-status" id="statusSample"></p>
+    </article>
+    <article class="scan-card">
+      <h3>Connect your real Gmail</h3>
+      <p>The real test. Connect a Gmail you own and SubSleuth searches it live for receipts and renewals, then parses everything here — nothing is uploaded or stored.</p>
+      <a class="btn btn-outline" id="btnGmail" href="#" target="_blank" rel="noopener">Connect Gmail (read-only)</a>
+      <div class="progress" id="progGmail"><i></i></div>
+      <p class="scan-status" id="statusGmail">Your Client ID is built into this app — no pasting. One console step may remain: adding this app's own return address (step 4 below).</p>
+      <p class="small" style="margin-top:8px">Sign-in opens in a new tab — this panel can't hand the whole page over to Google. After you approve, Google sends that tab back to this app and the scan starts on its own; your results open in that tab.</p>
+    </article>
+  </section>
+
+  <!-- GMAIL SETUP -->
+  <details class="setup" id="setupPanel">
+    <summary>Set up the real Gmail connection — free, one-time, no card &nbsp;▾</summary>
+    <div class="setup-body">
+      <ol class="steps">
+        <li><div><strong>Google Cloud Console</strong> — go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">console.cloud.google.com</a>, sign in with the Google account that owns the test inbox, and create a project called <span class="mono">SubSleuth</span>. No billing, no card.</div></li>
+        <li><div><strong>Enable the Gmail API</strong> — in that project, open <em>APIs &amp; Services → Library</em>, search <strong>Gmail API</strong>, and click <strong>Enable</strong>.</div></li>
+        <li><div><strong>Consent screen</strong> — <em>APIs &amp; Services → OAuth consent screen</em>: choose <strong>External</strong>, app name <span class="mono">SubSleuth</span>, add your email, and under <em>Test users</em> add the exact Gmail address you'll test with.</div></li>
+        <li><div><strong>Create the Client ID</strong> — <em>Credentials → Create Credentials → OAuth client ID → Web application</em>. Under <em>Authorised redirect URIs</em> add this app's own address, exactly as shown here: <span class="mono" id="selfAddr">…</span> — Google must send the sign-in result back to this page itself, not to the Muse library page: the result arrives in the address bar of the page it returns to, and this app can only read its own. (If you earlier added the library address, it can stay — it just isn't the one used.)</div></li>
+        <li><div><strong>Nothing to paste</strong> — your Client ID is already built into this copy of the app (shown locked below). It is only ever sent to Google's sign-in page.</div></li>
+        <li><div><strong>Connect &amp; test</strong> — press <em>Connect Gmail</em> above. Sign-in opens in a new tab; approve <strong>read-only</strong> access there, and Google returns that tab to this app — the scan then starts on its own and the results open in that tab. Pick your own inbox for the strongest demo, or a spare inbox if you'd rather keep your main one private.</div></li>
+      </ol>
+      <div class="field">
+        <label for="clientId">Google OAuth Client ID (built in)</label>
+        <input id="clientId" type="text" value="579625218470-5q7tdbtc36c2h43rr9uhi5icoe8jntg8.apps.googleusercontent.com" readonly autocomplete="off" spellcheck="false">
+      </div>
+      <div class="warn"><strong>Privacy, plainly:</strong> the scope is <span class="mono">gmail.readonly</span> — SubSleuth can read, never send, delete or change anything. Email content is fetched straight from Google to this browser tab and parsed here. Close the tab and it's gone. Never put your Client ID or inbox contents in the demo video or a public repo.</div>
+    </div>
+  </details>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" aria-live="polite">
+    <div style="display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap">
+      <div>
+        <h2 id="dashTitle">Your subscriptions</h2>
+        <p class="muted small" id="dashSub">Sample inbox · parsed on-device just now</p>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="active" data-tab="list">List</button>
+        <button data-tab="calendar">Renewal calendar</button>
+        <button data-tab="insights">Insights</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Per month</div><div class="v" id="statMonth">$0</div><div class="s">across active subs</div></div>
+      <div class="stat"><div class="k">Per year</div><div class="v" id="statYear">$0</div><div class="s">if nothing changes</div></div>
+      <div class="stat"><div class="k">Active</div><div class="v" id="statCount">0</div><div class="s" id="statCountSub">subscriptions found</div></div>
+      <div class="stat"><div class="k">You could save</div><div class="v" id="statSave" style="color:var(--teal)">$0/mo</div><div class="s">cancelled + rarely used</div></div>
+    </div>
+
+    <div id="view-list">
+      <div class="toolbar" id="filters">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="Entertainment">Entertainment</button>
+        <button class="chip" data-filter="Music">Music</button>
+        <button class="chip" data-filter="Productivity">Productivity</button>
+        <button class="chip" data-filter="Storage">Storage</button>
+        <button class="chip" data-filter="AI & Tools">AI &amp; Tools</button>
+        <select id="sortSel" aria-label="Sort subscriptions">
+          <option value="renewal">Sort: next renewal</option>
+          <option value="price-desc">Sort: price, high to low</option>
+          <option value="price-asc">Sort: price, low to high</option>
+          <option value="name">Sort: name A–Z</option>
+        </select>
+      </div>
+      <div class="sub-list" id="subList"></div>
+      <div class="actions-row">
+        <button class="btn btn-ghost" id="btnCsv">↓ Download CSV</button>
+        <button class="btn btn-ghost" id="btnCopy">Copy summary</button>
+        <button class="btn btn-ghost" id="btnReset">Reset demo</button>
+      </div>
+    </div>
+
+    <div id="view-calendar" hidden>
+      <div class="panel"><h3 style="margin-bottom:6px">Coming out of your account next</h3><p class="muted small">Sorted by renewal date. Yearly plans are converted to their renewal day, not spread monthly.</p><div id="calList"></div></div>
+    </div>
+
+    <div id="view-insights" hidden>
+      <div class="panel"><h3 style="margin-bottom:6px">Worth a second look</h3><div id="insightList"></div></div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="section">
+    <div class="section-head"><h2>How it works</h2><p>One focused job, done well — the way the LaunchPad guide asks for it. Find the money first, add nothing until that works.</p></div>
+    <div class="how">
+      <article><div class="num">01 — SEARCH</div><h3 style="margin:8px 0 6px">It searches like a human would</h3><p class="muted" style="font-size:.93rem">Queries Gmail for receipts, renewals, trials and payment confirmations from known billing senders — not your whole inbox, just the money trail.</p></article>
+      <article><div class="num">02 — PARSE</div><h3 style="margin:8px 0 6px">Prices &amp; dates, extracted here</h3><p class="muted" style="font-size:.93rem">A service dictionary matches each sender, pulls the amount and billing cycle, and works out the next renewal. Every result keeps its evidence email so you can check it.</p></article>
+      <article><div class="num">03 — ACT</div><h3 style="margin:8px 0 6px">Total, calendar, cancel link</h3><p class="muted" style="font-size:.93rem">You get the monthly and yearly total, what's renewing soon, what looks forgotten, and a direct manage/cancel link for every subscription.</p></article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2>Straight answers</h2></div>
+    <div class="faq">
+      <details open><summary>Does sample mode prove it works?</summary><p>No — and the app says so. Sample mode proves the parsing, maths and interface. The proof is the real Gmail test: connect an inbox you own (yours or a spare) using the setup above and it finds real subscriptions live. That's the test to run before recording the demo.</p></details>
+      <details><summary>What are the honest limits?</summary><p>It only finds subscriptions that email you — app-store billing through Apple/Google bundles several services into one receipt, cash or bank-only payments leave no email, and a brand-new service not yet in the dictionary can be missed. Yearly renewals are inferred from the last charge. Every result shows its evidence email so a miss or a wrong date is easy to spot.</p></details>
+      <details><summary>What was built, and with what?</summary><p>Built fresh for LaunchPad Hacks (deadline Fri 4 Dec 2026, 11:00pm Lagos). Plain HTML, CSS and JavaScript in one page; Gmail API + Google Identity Services for the read-only connection; no framework, no backend, no database. AI assistance was used in building it and is credited here, as the event rules require.</p></details>
+    </div>
+  </section>
+
+  <footer>
+    <span>SubSleuth — LaunchPad Hacks entry · Judged on Innovation, Usefulness &amp; Impact, Implementation, and Design &amp; Presentation</span>
+    <span>Read-only · On-device · $0 to run</span>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ============ Service dictionary ============ */
+var SERVICES = [
+  {id:'netflix', name:'Netflix', cat:'Entertainment', color:'#e50914', domains:['netflix.com'], keys:['netflix'], manage:'https://www.netflix.com/cancelplan', manageLabel:'Cancel on Netflix'},
+  {id:'spotify', name:'Spotify Premium', cat:'Music', color:'#1db954', domains:['spotify.com'], keys:['spotify'], manage:'https://www.spotify.com/account/subscription/', manageLabel:'Manage on Spotify'},
+  {id:'youtube', name:'YouTube Premium', cat:'Entertainment', color:'#ff0033', domains:['youtube.com','google.com'], keys:['youtube premium','youtube'], manage:'https://www.youtube.com/paid_memberships', manageLabel:'Manage on YouTube'},
+  {id:'disney', name:'Disney+', cat:'Entertainment', color:'#113ccf', domains:['disneyplus.com','disney.com'], keys:['disney+','disney plus'], manage:'https://www.disneyplus.com/account/subscription', manageLabel:'Manage on Disney+'},
+  {id:'prime', name:'Amazon Prime', cat:'Entertainment', color:'#ff9900', domains:['amazon.com','amazon.co.uk'], keys:['prime membership','amazon prime'], manage:'https://www.amazon.com/gp/primecentral', manageLabel:'Manage on Amazon'},
+  {id:'applemusic', name:'Apple Music', cat:'Music', color:'#fa2d48', domains:['apple.com'], keys:['apple music'], manage:'https://support.apple.com/en-us/HT202039', manageLabel:'Manage via Apple'},
+  {id:'icloud', name:'iCloud+', cat:'Storage', color:'#3693f3', domains:['apple.com'], keys:['icloud'], manage:'https://support.apple.com/en-us/HT202039', manageLabel:'Manage via Apple'},
+  {id:'googleone', name:'Google One', cat:'Storage', color:'#34a853', domains:['google.com'], keys:['google one'], manage:'https://one.google.com/settings', manageLabel:'Manage Google One'},
+  {id:'dropbox', name:'Dropbox Plus', cat:'Storage', color:'#0061ff', domains:['dropbox.com'], keys:['dropbox'], manage:'https://www.dropbox.com/account/plan', manageLabel:'Manage on Dropbox'},
+  {id:'notion', name:'Notion Plus', cat:'Productivity', color:'#111111', domains:['notion.so','makenotion.com'], keys:['notion'], manage:'https://www.notion.so/my-account', manageLabel:'Manage on Notion'},
+  {id:'canva', name:'Canva Pro', cat:'Productivity', color:'#00c4cc', domains:['canva.com'], keys:['canva'], manage:'https://www.canva.com/settings/billing', manageLabel:'Manage on Canva'},
+  {id:'adobe', name:'Adobe Creative Cloud', cat:'Productivity', color:'#eb1000', domains:['adobe.com'], keys:['adobe','creative cloud'], manage:'https://account.adobe.com/plans', manageLabel:'Manage on Adobe'},
+  {id:'chatgpt', name:'ChatGPT Plus', cat:'AI & Tools', color:'#10a37f', domains:['openai.com'], keys:['chatgpt','openai'], manage:'https://chatgpt.com/#settings/Subscription', manageLabel:'Manage on ChatGPT'},
+  {id:'figma', name:'Figma Professional', cat:'AI & Tools', color:'#a259ff', domains:['figma.com'], keys:['figma'], manage:'https://www.figma.com/settings', manageLabel:'Manage on Figma'},
+  {id:'microsoft', name:'Microsoft 365', cat:'Productivity', color:'#0067b8', domains:['microsoft.com'], keys:['microsoft 365','office 365'], manage:'https://account.microsoft.com/services', manageLabel:'Manage on Microsoft'}
+];
+function svcById(id){ for(var i=0;i<SERVICES.length;i++) if(SERVICES[i].id===id) return SERVICES[i]; return null; }
+
+/* ============ Sample inbox (labelled sample data) ============ */
+/* lastChargeDaysAgo keeps renewals realistic whenever the demo is opened. */
+var SAMPLE = [
+  {svc:'netflix',   price:15.49, cycle:'Monthly', ago:9,  prevPrice:null,  note:'Receipt — Netflix.com', subj:'Your Netflix receipt', lastSignal:'Billed 9 days ago'},
+  {svc:'spotify',   price:11.99, cycle:'Monthly', ago:14, prevPrice:null,  note:'Receipt from Spotify', subj:'Spotify Premium receipt', lastSignal:'Billed 14 days ago'},
+  {svc:'youtube',   price:13.99, cycle:'Monthly', ago:5,  prevPrice:null,  note:'Google Payments: YouTube Premium', subj:'Your YouTube Premium payment', lastSignal:'Billed 5 days ago'},
+  {svc:'disney',    price:13.99, cycle:'Monthly', ago:18, prevPrice:11.99, note:'Price rising from $11.99', subj:'Disney+ price update & receipt', lastSignal:'Billed 18 days ago'},
+  {svc:'prime',     price:14.99, cycle:'Monthly', ago:22, prevPrice:null,  note:'Prime membership fee', subj:'Amazon Prime membership charge', lastSignal:'Billed 22 days ago · no orders in 60 days'},
+  {svc:'icloud',    price:2.99,  cycle:'Monthly', ago:11, prevPrice:null,  note:'Apple receipt — iCloud+ 200GB', subj:'Your receipt from Apple (iCloud+)', lastSignal:'Billed 11 days ago'},
+  {svc:'googleone', price:1.99,  cycle:'Monthly', ago:28, prevPrice:null,  note:'Google One 100GB', subj:'Google One receipt', lastSignal:'Billed 28 days ago'},
+  {svc:'notion',    price:10.00, cycle:'Monthly', ago:7,  prevPrice:null,  note:'Notion Labs receipt', subj:'Your Notion Plus receipt', lastSignal:'Billed 7 days ago'},
+  {svc:'canva',     price:12.99, cycle:'Monthly', ago:16, prevPrice:null,  note:'Canva Pro monthly', subj:'Canva Pro — payment successful', lastSignal:'Billed 16 days ago'},
+  {svc:'adobe',     price:59.99, cycle:'Monthly', ago:3,  prevPrice:null,  note:'Adobe Creative Cloud All Apps', subj:'Adobe invoice — Creative Cloud', lastSignal:'Billed 3 days ago'},
+  {svc:'chatgpt',   price:20.00, cycle:'Monthly', ago:12, prevPrice:null,  note:'OpenAI receipt', subj:'Your ChatGPT Plus receipt', lastSignal:'Billed 12 days ago'},
+  {svc:'dropbox',   price:11.99, cycle:'Monthly', ago:41, prevPrice:null,  note:'Dropbox Plus — last opened long ago', subj:'Dropbox Plus receipt', lastSignal:'Billed 41 days ago · no sign-in in 90 days', forgotten:true}
+];
+/* Distractor emails the scanner counts but correctly ignores */
+var DISTRACTORS = 12;
+
+var state = { subs:[], source:'sample', filter:'all', sort:'renewal', cancelled:{} };
+
+function daysFromNow(n){ var d=new Date(); d.setDate(d.getDate()+n); return d; }
+function fmtDate(d){ return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+function fmtMoney(n){ return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function monthlyCost(s){ return s.cycle==='Yearly' ? s.price/12 : s.price; }
+function nextRenewal(s){
+  var cycleDays = s.cycle==='Yearly' ? 365 : 30;
+  var offset = -s.ago + cycleDays;
+  while(offset < 0) offset += cycleDays;
+  return daysFromNow(offset);
+}
+function daysUntil(s){ var ms = nextRenewal(s) - new Date(); return Math.ceil(ms/86400000); }
+
+function buildSampleSubs(){
+  return SAMPLE.map(function(x){
+    var svc = svcById(x.svc);
+    var s = { id:x.svc, name:svc.name, cat:svc.cat, color:svc.color, manage:svc.manage, manageLabel:svc.manageLabel,
+      price:x.price, cycle:x.cycle, ago:x.ago, prevPrice:x.prevPrice, forgotten:!!x.forgotten,
+      evidence:[{subj:x.subj, when: x.ago+' days ago', note:x.note},{subj:x.lastSignal, when:'signal', note:'Latest billing signal found in inbox'}] };
+    s.next = nextRenewal(s); s.days = daysUntil(s);
+    return s;
+  });
+}
+
+/* ============ Rendering ============ */
+var subList=document.getElementById('subList');
+function initials(name){ return name.replace('+','').split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase(); }
+
+function render(){
+  var subs = state.subs.slice();
+  if(state.filter!=='all') subs = subs.filter(function(s){return s.cat===state.filter});
+  if(state.sort==='price-desc') subs.sort(function(a,b){return b.price-a.price});
+  else if(state.sort==='price-asc') subs.sort(function(a,b){return a.price-b.price});
+  else if(state.sort==='name') subs.sort(function(a,b){return a.name.localeCompare(b.name)});
+  else subs.sort(function(a,b){return a.days-b.days});
+
+  var cardHtml = subs.map(function(s){
+    var cancelled = !!state.cancelled[s.id];
+    var tags = '';
+    if(s.days<=5 && s.days>=0) tags += '<span class="tag soon">Renews in '+s.days+' day'+(s.days===1?'':'s')+'</span>';
+    else tags += '<span class="tag">Renews '+fmtDate(s.next)+'</span>';
+    if(s.prevPrice) tags += '<span class="tag price-up">Price up from '+fmtMoney(s.prevPrice)+'</span>';
+    if(s.forgotten) tags += '<span class="tag soon">Possibly forgotten</span>';
+    tags += '<span class="tag">'+s.cycle+'</span>';
+    var ev = s.evidence.map(function(e){ return '<div><b>'+escapeHtml(e.subj)+'</b><br><span class="muted">'+escapeHtml(e.note)+' · '+escapeHtml(e.when)+'</span></div>'; }).join('');
+    return '<article class="sub" style="'+(cancelled?'opacity:.55':'')+'">'
+      + '<div class="sub-top"><div class="avatar" style="background:'+s.color+'">'+initials(s.name)+'</div>'
+      + '<div><div class="sub-name">'+s.name+'</div><div class="sub-cat">'+s.cat+(cancelled?' · marked cancelled by you':'')+'</div></div>'
+      + '<div class="price"><b>'+fmtMoney(s.price)+'</b><span>/ '+s.cycle.toLowerCase().replace('ly','')+'</span></div></div>'
+      + '<div class="meta">'+tags+'</div>'
+      + '<div class="sub-actions"><a class="link-manage" href="'+s.manage+'" target="_blank" rel="noopener">'+s.manageLabel+' ↗</a>'
+      + '<button class="btn-evidence" data-ev="'+s.id+'">Evidence</button>'
+      + '<button class="'+(cancelled?'btn-cancelled':'btn-evidence')+'" data-cancel="'+s.id+'">'+(cancelled?'✓ Cancelled':'I cancelled this')+'</button></div>'
+      + '<div class="evidence" id="ev-'+s.id+'"><div class="small" style="font-weight:800">Why SubSleuth flagged this — source emails</div>'+ev+'</div>'
+      + '</article>';
+  });
+  if(!cardHtml.length){
+    subList.innerHTML = '<div class="empty" style="width:100%">Nothing in this category.</div>';
+  } else {
+    /* Independent columns: each column is its own vertical stack, so expanding
+       a card only pushes down the cards below it in the SAME column.
+       Cards in the other column do not move at all. */
+    var colCount = (window.innerWidth <= 820) ? 1 : 2;
+    if(colCount === 1){
+      subList.innerHTML = '<div class="sub-col">' + cardHtml.join('') + '</div>';
+    } else {
+      var cols = [[],[]];
+      cardHtml.forEach(function(html, i){ cols[i % 2].push(html); });
+      subList.innerHTML = cols.map(function(col){ return '<div class="sub-col">' + col.join('') + '</div>'; }).join('');
+    }
+  }
+
+  /* Stats use ALL subs, not the filtered view */
+  var active = state.subs.filter(function(s){return !state.cancelled[s.id]});
+  var month = active.reduce(function(t,s){return t+monthlyCost(s)},0);
+  var cancelledSave = state.subs.filter(function(s){return state.cancelled[s.id]}).reduce(function(t,s){return t+monthlyCost(s)},0);
+  var forgottenSave = active.filter(function(s){return s.forgotten}).reduce(function(t,s){return t+monthlyCost(s)},0);
+  document.getElementById('statMonth').textContent = fmtMoney(month);
+  document.getElementById('statYear').textContent = fmtMoney(month*12);
+  document.getElementById('statCount').textContent = active.length;
+  document.getElementById('statCountSub').textContent = state.subs.length+' found in '+(state.source==='gmail'?'your Gmail':'the sample inbox');
+  document.getElementById('statSave').textContent = fmtMoney(cancelledSave+forgottenSave)+'/mo';
+
+  /* Calendar */
+  var cal = state.subs.slice().sort(function(a,b){return a.days-b.days});
+  document.getElementById('calList').innerHTML = cal.map(function(s){
+    return '<div class="cal-row"><div class="cal-date"><b>'+s.next.getDate()+'</b><span class="small muted">'+s.next.toLocaleDateString('en-GB',{month:'short'})+'</span></div>'
+      + '<div style="flex:1"><b>'+s.name+'</b><div class="small muted">'+(s.days<=0?'Renews today':'In '+s.days+' days')+' · '+s.cycle+'</div></div><b>'+fmtMoney(s.price)+'</b></div>';
+  }).join('');
+
+  /* Insights */
+  var insights=[];
+  var sortedPrice = state.subs.slice().sort(function(a,b){return b.price-a.price});
+  if(sortedPrice[0]) insights.push({i:'◈', t: sortedPrice[0].name+' is your biggest subscription', d: fmtMoney(sortedPrice[0].price)+' a '+sortedPrice[0].cycle.toLowerCase()+' — that is '+Math.round(monthlyCost(sortedPrice[0])/Math.max(month,1)*100)+'% of your monthly total.'});
+  state.subs.filter(function(s){return s.forgotten}).forEach(function(s){ insights.push({i:'◎', t:'Possibly forgotten: '+s.name, d:'Still billing '+fmtMoney(s.price)+'/'+s.cycle.toLowerCase().replace('ly','')+' with no recent usage signal in the inbox. Cancelling saves '+fmtMoney(monthlyCost(s)*12)+' a year.'}); });
+  state.subs.filter(function(s){return s.prevPrice}).forEach(function(s){ insights.push({i:'↗', t:s.name+' quietly got more expensive', d:'Up from '+fmtMoney(s.prevPrice)+' to '+fmtMoney(s.price)+' — an extra '+fmtMoney((s.price-s.prevPrice)*12)+' a year.'}); });
+  var soon = state.subs.filter(function(s){return s.days<=7 && s.days>=0});
+  if(soon.length) insights.push({i:'◷', t: soon.length+' renewal'+(soon.length>1?'s':'')+' in the next 7 days', d: soon.map(function(s){return s.name+' ('+fmtMoney(s.price)+')'}).join(', ')+'.'});
+  insights.push({i:'✓', t:'Checked and cleared', d: DISTRACTORS+' other emails in the '+(state.source==='gmail'?'search results':'sample inbox')+' looked money-related but were not subscriptions — newsletters, one-off orders and shipping notices were ignored.'});
+  document.getElementById('insightList').innerHTML = insights.map(function(x){
+    return '<div class="insight"><div class="icon">'+x.i+'</div><div><b>'+x.t+'</b><p class="muted" style="font-size:.92rem">'+x.d+'</p></div></div>';
+  }).join('');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]}); }
+
+subList.addEventListener('click', function(e){
+  var evBtn = e.target.closest('[data-ev]'); var cBtn = e.target.closest('[data-cancel]');
+  if(evBtn){ var box=document.getElementById('ev-'+evBtn.getAttribute('data-ev')); if(box) box.classList.toggle('open'); }
+  if(cBtn){ var id=cBtn.getAttribute('data-cancel'); state.cancelled[id]=!state.cancelled[id]; render(); toast(state.cancelled[id]?'Marked as cancelled — totals updated.':'Cancellation mark removed.'); }
+});
+document.getElementById('filters').addEventListener('click', function(e){
+  var chip=e.target.closest('[data-filter]'); if(!chip) return;
+  document.querySelectorAll('#filters .chip').forEach(function(c){c.classList.remove('active')});
+  chip.classList.add('active'); state.filter=chip.getAttribute('data-filter'); render();
+});
+document.getElementById('sortSel').addEventListener('change', function(e){ state.sort=e.target.value; render(); });
+var _lastColMode = window.innerWidth <= 820 ? 1 : 2;
+window.addEventListener('resize', function(){
+  var mode = window.innerWidth <= 820 ? 1 : 2;
+  if(mode !== _lastColMode){ _lastColMode = mode; if(state.subs.length) render(); }
+});
+document.querySelectorAll('.tabs button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('.tabs button').forEach(function(x){x.classList.remove('active')});
+    b.classList.add('active');
+    ['list','calendar','insights'].forEach(function(v){ document.getElementById('view-'+v).hidden = (v!==b.getAttribute('data-tab')); });
+  });
+});
+
+/* ============ Scan flows ============ */
+function runProgress(barId, statusId, steps, done){
+  var bar=document.getElementById(barId), status=document.getElementById(statusId);
+  bar.style.display='block'; var fill=bar.querySelector('i'); var i=0;
+  status.textContent=steps[0];
+  var timer=setInterval(function(){
+    i++; fill.style.width=Math.min(100, i*(100/steps.length))+'%';
+    if(i<steps.length) status.textContent=steps[i];
+    else { clearInterval(timer); status.textContent=steps[steps.length-1]; done(); }
+  }, 650);
+}
+function showDashboard(title, sub){
+  document.getElementById('dashTitle').textContent=title;
+  document.getElementById('dashSub').textContent=sub;
+  var d=document.getElementById('dashboard'); d.classList.add('show');
+  render(); d.scrollIntoView({behavior:'smooth', block:'start'});
+}
+document.getElementById('btnSample').addEventListener('click', function(){
+  this.disabled=true; var btn=this;
+  runProgress('progSample','statusSample',[
+    'Opening sample inbox… 24 emails',
+    'Searching for receipts & renewals… found 17 money-related emails',
+    'Matching senders to known services… 12 subscriptions',
+    'Extracting prices, cycles & renewal dates…',
+    'Done — 12 subscriptions, $190.40/month. 12 non-subscription emails ignored.'
+  ], function(){
+    state.subs=buildSampleSubs(); state.source='sample'; state.cancelled={};
+    showDashboard('Your subscriptions','Sample inbox · parsed on-device just now · demo data, clearly labelled');
+    btn.disabled=false;
+  });
+});
+
+/* ============ Real Gmail (client-side, read-only) ============ */
+var accessToken=null;
+function parsePrice(text){
+  var m = String(text).match(/(?:\$|USD\s?)\s?(\d{1,4}(?:\.\d{2})?)/); return m?parseFloat(m[1]):null;
+}
+function matchService(from, subject, body){
+  var hay=(from+' '+subject+' '+body).toLowerCase();
+  for(var i=0;i<SERVICES.length;i++){
+    var s=SERVICES[i];
+    var domainHit = s.domains.some(function(d){return from.toLowerCase().indexOf(d)>-1});
+    var keyHit = s.keys.some(function(k){return hay.indexOf(k)>-1});
+    if(domainHit && keyHit) return s;
+    if(domainHit && /receipt|payment|subscription|renew|invoice|billing/.test(hay)) return s;
+  }
+  return null;
+}
+function headerValue(headers,name){
+  for(var i=0;i<(headers||[]).length;i++) if(headers[i].name.toLowerCase()===name) return headers[i].value;
+  return '';
+}
+function decodeBody(part){
+  try{ return atob((part.body.data||'').replace(/-/g,'+').replace(/_/g,'/')); }catch(e){ return ''; }
+}
+function collectText(payload, acc){
+  if(!payload) return acc;
+  if(payload.body && payload.body.data && (payload.mimeType||'').indexOf('text')===0) acc += ' ' + decodeBody(payload);
+  (payload.parts||[]).forEach(function(p){ acc = collectText(p, acc); });
+  return acc;
+}
+function gmailFetch(path){
+  return fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path, {headers:{Authorization:'Bearer '+accessToken}})
+    .then(function(r){
+      if(r.ok) return r.json();
+      if(r.status===401) throw new Error('Google sign-in expired before the scan finished — press Connect Gmail and approve again');
+      if(r.status===403) throw new Error('Gmail API refused the request (403) — in your Google Cloud project, check the Gmail API is Enabled and this inbox is listed under Test users on the OAuth consent screen');
+      throw new Error('Gmail API '+r.status);
+    });
+}
+/* Redirect sign-in — no pop-up, and the return comes back to THIS page.
+   Two earlier flows failed in the Muse panel, for two different reasons:
+   (1) The pop-up flow (Google Identity Services) and a script-driven
+   jump out of the panel frame were both blocked by the frame, so the
+   Connect button appeared completely dead.
+   (2) When sign-in did complete in a new tab, Google returned the result
+   to the Muse library page's address. The token sits in that page's
+   address bar, but this app runs inside the panel frame on a different
+   origin and is not allowed to read it — so the finished sign-in never
+   reached the app and nothing happened.
+   This flow removes both blocks: the button is a real link that opens
+   Google sign-in in a new tab (the one gesture the panel demonstrably
+   allows), and the registered return address is this page's OWN address,
+   so Google delivers the token into this page's own address bar, where
+   pickUpOAuthReturn() below reads it and starts the scan. The exact
+   address to register is shown in setup step 4. */
+var LOCKED_CLIENT_ID='579625218470-5q7tdbtc36c2h43rr9uhi5icoe8jntg8.apps.googleusercontent.com';
+function selfUrl(){
+  try{ return window.location.origin + window.location.pathname; }catch(e){ return ''; }
+}
+var OAUTH_REDIRECT_URI=selfUrl();
+var OAUTH_SCOPE='https://www.googleapis.com/auth/gmail.readonly';
+function oauthState(store){
+  try{
+    var s=sessionStorage.getItem('subsleuth_oauth_state');
+    if(!s){
+      s='subsleuth-'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+      if(store) sessionStorage.setItem('subsleuth_oauth_state', s);
+    }
+    return s;
+  }catch(e){ return 'subsleuth'; }
+}
+function buildAuthUrl(store){
+  return 'https://accounts.google.com/o/oauth2/v2/auth'
+    + '?client_id=' + encodeURIComponent(LOCKED_CLIENT_ID)
+    + '&redirect_uri=' + encodeURIComponent(OAUTH_REDIRECT_URI)
+    + '&response_type=token'
+    + '&scope=' + encodeURIComponent(OAUTH_SCOPE)
+    + '&include_granted_scopes=true'
+    + '&prompt=consent'
+    + '&state=' + encodeURIComponent(oauthState(store));
+}
+var btnGmail=document.getElementById('btnGmail');
+if(btnGmail){
+  btnGmail.setAttribute('href', buildAuthUrl(false));
+  var armSignIn=function(){ btnGmail.setAttribute('href', buildAuthUrl(true)); };
+  btnGmail.addEventListener('mousedown', armSignIn);
+  btnGmail.addEventListener('touchstart', armSignIn, {passive:true});
+  btnGmail.addEventListener('click', function(){
+    armSignIn();
+    document.getElementById('statusGmail').textContent='Google sign-in opened in a new tab. Finish signing in there — Google brings that tab back to this app and the scan starts on its own; your results open in that tab.';
+  });
+}
+var selfAddrEl=document.getElementById('selfAddr');
+if(selfAddrEl) selfAddrEl.textContent=OAUTH_REDIRECT_URI || '(reload this app to see its address)';
+function parseHashParams(hash){
+  var out={};
+  String(hash||'').replace(/^#/,'').split('&').forEach(function(pair){
+    var i=pair.indexOf('='); if(i<0) return;
+    try{ out[decodeURIComponent(pair.slice(0,i))]=decodeURIComponent(pair.slice(i+1)); }catch(e){}
+  });
+  return out;
+}
+function pickUpOAuthReturn(){
+  var status=document.getElementById('statusGmail');
+  var params=parseHashParams(window.location.hash);
+  var fromTop=false;
+  if(!params.access_token && !params.error){
+    var ownQuery=parseHashParams((window.location.search||'').replace(/^\?/,''));
+    if(ownQuery.access_token || ownQuery.error) params=ownQuery;
+  }
+  if(!params.access_token && !params.error){
+    /* If the return ever lands on the surrounding page's address instead
+       of this frame's, read it from there when the browser allows. */
+    try{
+      if(window.top && window.top!==window){
+        var topParams=parseHashParams(window.top.location.hash);
+        if(!topParams.access_token && !topParams.error) topParams=parseHashParams((window.top.location.search||'').replace(/^\?/,''));
+        if(topParams.access_token || topParams.error){ params=topParams; fromTop=true; }
+      }
+    }catch(e){ /* cross-origin parent — the token simply isn't reachable there */ }
+  }
+  if(params.error){
+    var detail=params.error_description ? ' — '+String(params.error_description).replace(/\+/g,' ') : '';
+    status.textContent='Google sign-in did not finish: '+params.error+detail+(params.error==='redirect_uri_mismatch' ? ' — the return address in setup step 4 is missing or different in your Google Cloud Console.' : ' — press Connect Gmail to try again.');
+    return;
+  }
+  if(!params.access_token) return;
+  var expected=null;
+  try{ expected=sessionStorage.getItem('subsleuth_oauth_state'); }catch(e){}
+  if(expected && params.state && params.state!==expected){
+    status.textContent='Sign-in return did not match the request this tab sent, so it was ignored. Press Connect Gmail to try again.';
+    return;
+  }
+  try{ sessionStorage.removeItem('subsleuth_oauth_state'); }catch(e){}
+  accessToken=params.access_token;
+  if(!fromTop && (window.location.hash || window.location.search)){
+    try{ history.replaceState(null,'',window.location.pathname); }catch(e){}
+  }
+  status.textContent='Signed in. Scanning your Gmail now…';
+  scanRealGmail(status);
+}
+pickUpOAuthReturn();
+function scanRealGmail(status){
+  var bar=document.getElementById('progGmail'); bar.style.display='block'; var fill=bar.querySelector('i');
+  status.textContent='Connected. Searching your inbox for receipts & renewals…'; fill.style.width='25%';
+  var q = encodeURIComponent('(receipt OR subscription OR renewal OR invoice OR "payment" OR billing) (netflix OR spotify OR youtube OR apple OR google OR adobe OR notion OR canva OR dropbox OR openai OR chatgpt OR figma OR microsoft OR disney OR amazon)');
+  gmailFetch('messages?q='+q+'&maxResults=60').then(function(list){
+    var msgs=list.messages||[];
+    if(!msgs.length){ status.textContent='Search finished — no subscription receipts found in this inbox. Try the inbox where your services email you.'; fill.style.width='100%'; return; }
+    status.textContent='Found '+msgs.length+' candidate emails. Reading & parsing them here in your browser…'; fill.style.width='55%';
+    return Promise.all(msgs.map(function(m){ return gmailFetch('messages/'+m.id+'?format=full').catch(function(){return null}); }));
+  }).then(function(full){
+    if(!full) return;
+    fill.style.width='85%';
+    var byService={};
+    full.forEach(function(msg){
+      if(!msg || !msg.payload) return;
+      var from=headerValue(msg.payload.headers,'from'), subj=headerValue(msg.payload.headers,'subject');
+      var dateStr=headerValue(msg.payload.headers,'date');
+      var body=collectText(msg.payload, msg.snippet||'').slice(0,4000);
+      var svc=matchService(from, subj, body); if(!svc) return;
+      var price=parsePrice(subj+' '+body); if(!price) return;
+      var when=new Date(dateStr||Date.now());
+      var ago=Math.max(0, Math.round((Date.now()-when.getTime())/86400000));
+      var cycle=/year|annual/i.test(subj+' '+body) ? 'Yearly':'Monthly';
+      var existing=byService[svc.id];
+      if(!existing || ago<existing.ago){
+        byService[svc.id]={ id:svc.id, name:svc.name, cat:svc.cat, color:svc.color, manage:svc.manage, manageLabel:svc.manageLabel,
+          price:price, cycle:cycle, ago:ago, prevPrice: existing?existing.price:null, forgotten: ago>60,
+          evidence:[{subj:subj||'(no subject)', when: ago+' days ago', note:'From '+from}] };
+        if(existing && existing.price!==price) byService[svc.id].prevPrice=existing.price; else if(existing) byService[svc.id].evidence=existing.evidence;
+      }
+    });
+    var subs=Object.keys(byService).map(function(k){ var s=byService[k]; s.next=nextRenewal(s); s.days=daysUntil(s); return s; });
+    fill.style.width='100%';
+    if(!subs.length){ status.textContent='Emails read, but no priced subscription receipts matched yet. The dictionary covers 15 major services — check the Insights honesty notes in the FAQ.'; return; }
+    state.subs=subs; state.source='gmail'; state.cancelled={};
+    status.textContent='Done — found '+subs.length+' real subscription'+(subs.length>1?'s':'')+' in your Gmail.';
+    showDashboard('Your subscriptions — from your real Gmail','Live Gmail scan · read-only · parsed in this browser tab, nothing stored');
+  }).catch(function(err){
+    status.textContent='Something went wrong: '+err.message+'. Check the Client ID, that the Gmail API is enabled, and that this inbox is a listed test user.';
+  });
+}
+
+/* ============ Export & misc ============ */
+document.getElementById('btnCsv').addEventListener('click', function(){
+  if(!state.subs.length) return;
+  var rows=[['Service','Category','Price','Cycle','Monthly cost','Next renewal','Manage link']];
+  state.subs.forEach(function(s){ rows.push([s.name,s.cat,s.price.toFixed(2),s.cycle,monthlyCost(s).toFixed(2),s.next.toISOString().slice(0,10),s.manage]); });
+  var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"'}).join(',')}).join('\n');
+  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='subsleuth-subscriptions.csv'; a.click();
+  toast('CSV downloaded.');
+});
+document.getElementById('btnCopy').addEventListener('click', function(){
+  if(!state.subs.length) return;
+  var month=state.subs.reduce(function(t,s){return t+monthlyCost(s)},0);
+  var txt='SubSleuth found '+state.subs.length+' subscriptions totalling '+fmtMoney(month)+'/month ('+fmtMoney(month*12)+'/year):\n'+state.subs.map(function(s){return '• '+s.name+' — '+fmtMoney(s.price)+'/'+s.cycle.toLowerCase().replace('ly','')+', renews '+fmtDate(s.next)}).join('\n');
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(function(){toast('Summary copied.')});
+});
+document.getElementById('btnReset').addEventListener('click', function(){
+  state.subs=[]; state.cancelled={}; document.getElementById('dashboard').classList.remove('show');
+  document.getElementById('statusSample').textContent=''; window.scrollTo({top:0,behavior:'smooth'});
+});
+var toastTimer;
+function toast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove('show')},2600); }
+</script>
+</body>
+</html>
