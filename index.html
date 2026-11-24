@@ -269,6 +269,7 @@ footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:v
           <option value="name">Sort: name A–Z</option>
         </select>
       </div>
+      <p class="small muted" id="filterCount" aria-live="polite" style="margin:10px 0 0"></p>
       <div class="sub-list" id="subList"></div>
       <div id="endedWrap"></div>
       <div class="actions-row">
@@ -438,16 +439,24 @@ function render(){
     }
   }
 
-  /* Stats use ALL subs, not the filtered view */
-  var active = state.subs.filter(function(s){return !state.cancelled[s.id]});
+  /* Stats follow the active category filter: they are computed from the
+     filtered view (subs), not from every subscription. When the filter is
+     All, subs is the full list, so the numbers are the overall totals. */
+  var active = subs.filter(function(s){return !state.cancelled[s.id]});
   var month = active.reduce(function(t,s){return t+monthlyCost(s)},0);
-  var cancelledSave = state.subs.filter(function(s){return state.cancelled[s.id]}).reduce(function(t,s){return t+monthlyCost(s)},0);
+  var cancelledSave = subs.filter(function(s){return state.cancelled[s.id]}).reduce(function(t,s){return t+monthlyCost(s)},0);
   var forgottenSave = active.filter(function(s){return s.forgotten}).reduce(function(t,s){return t+monthlyCost(s)},0);
   document.getElementById('statMonth').textContent = fmtMoney(month);
   document.getElementById('statYear').textContent = fmtMoney(month*12);
   document.getElementById('statCount').textContent = active.length;
-  document.getElementById('statCountSub').textContent = state.subs.length+' found in '+(state.source==='gmail'?'your Gmail':'the sample inbox');
+  document.getElementById('statCountSub').textContent = state.filter==='all'
+    ? state.subs.length+' found in '+(state.source==='gmail'?'your Gmail':'the sample inbox')
+    : active.length+' of '+state.subs.length+' found';
   document.getElementById('statSave').textContent = fmtMoney(cancelledSave+forgottenSave)+'/mo';
+  var filterCountEl = document.getElementById('filterCount');
+  if(filterCountEl) filterCountEl.textContent = state.subs.length ? 'Showing '+subs.length+' of '+state.subs.length+' subscription'+(state.subs.length===1?'':'s') : '';
+  /* Overall monthly total, kept for the insights (which stay overall). */
+  var overallMonth = state.subs.filter(function(s){return !state.cancelled[s.id]}).reduce(function(t,s){return t+monthlyCost(s)},0);
 
   /* Calendar */
   var cal = state.subs.slice().sort(function(a,b){return a.days-b.days});
@@ -459,7 +468,7 @@ function render(){
   /* Insights */
   var insights=[];
   var sortedPrice = state.subs.slice().sort(function(a,b){return b.price-a.price});
-  if(sortedPrice[0]) insights.push({i:'◈', t: sortedPrice[0].name+' is your biggest subscription', d: fmtMoney(sortedPrice[0].price)+' a '+sortedPrice[0].cycle.toLowerCase()+' — that is '+Math.round(monthlyCost(sortedPrice[0])/Math.max(month,1)*100)+'% of your monthly total.'});
+  if(sortedPrice[0]) insights.push({i:'◈', t: sortedPrice[0].name+' is your biggest subscription', d: fmtMoney(sortedPrice[0].price)+' a '+sortedPrice[0].cycle.toLowerCase()+' — that is '+Math.round(monthlyCost(sortedPrice[0])/Math.max(overallMonth,1)*100)+'% of your monthly total.'});
   state.subs.filter(function(s){return s.forgotten}).forEach(function(s){ insights.push({i:'◎', t:'Possibly forgotten: '+s.name, d:'Still billing '+fmtMoney(s.price)+'/'+s.cycle.toLowerCase().replace('ly','')+' with no recent usage signal in the inbox. Cancelling saves '+fmtMoney(monthlyCost(s)*12)+' a year.'}); });
   state.subs.filter(function(s){return s.prevPrice}).forEach(function(s){ insights.push({i:'↗', t:s.name+' quietly got more expensive', d:'Up from '+fmtMoney(s.prevPrice)+' to '+fmtMoney(s.price)+' — an extra '+fmtMoney((s.price-s.prevPrice)*12)+' a year.'}); });
   var soon = state.subs.filter(function(s){return s.days<=7 && s.days>=0});
@@ -479,7 +488,9 @@ function renderEnded(){
   var wrap=document.getElementById('endedWrap');
   if(!wrap) return;
   if(!state.ended || !state.ended.length){ wrap.innerHTML=''; return; }
-  var items=state.ended.map(function(s){
+  var endedFiltered = state.filter==='all' ? state.ended : state.ended.filter(function(s){return s.cat===state.filter});
+  if(!endedFiltered.length){ wrap.innerHTML=''; return; }
+  var items=endedFiltered.map(function(s){
     var lastPaid=daysFromNow(-s.ago).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
     var ev=s.evidence.map(function(e){ return '<div style="padding:4px 0"><b>'+escapeHtml(e.subj)+'</b><br><span class="muted">'+escapeHtml(e.note)+' · '+escapeHtml(e.when)+'</span></div>'; }).join('');
     return '<div class="ended-item">'
